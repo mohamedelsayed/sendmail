@@ -29,9 +29,17 @@ function elsayed_menu() {
         'page callback' => 'elsayed_access_denied',
         'access arguments' => array('access content')
     );
-    $items['contact-us-form'] = array(
-        'title' => t('Contact us'),
-        'page callback' => 'elsayed_contact_us_form',
+//    $items['contact-us-form'] = array(
+//        'title' => t('Contact us'),
+//        'page callback' => 'elsayed_contact_us_form',
+//        'page arguments' => array(),
+//        'type' => MENU_CALLBACK,
+//        'access arguments' => array('access content'),
+//        'delivery callback' => 'drupal_json_output',
+//    );
+    $items['send-mail-api'] = array(
+        'title' => t('Send mail api'),
+        'page callback' => 'elsayed_send_mail_api',
         'page arguments' => array(),
         'type' => MENU_CALLBACK,
         'access arguments' => array('access content'),
@@ -1902,4 +1910,104 @@ function elsayed_update_7103() {
         'primary key' => array('id'),
     );
     db_create_table('translation', $schema);
+}
+
+function elsayed_send_mail_api() {
+    $data = [];
+    $data['error'] = 1;
+    $daytIn = [];
+    if (isset($_POST)) {
+        $daytIn = $_POST;
+    }
+    if (!empty($daytIn)) {
+        $token = '';
+        if (isset($daytIn['token'])) {
+            $token = $daytIn['token'];
+        }
+        $mailserver = getMailserverByToken($token);
+        if (!empty($mailserver)) {
+            $host = '';
+            if (isset($mailserver->field_host[LANGUAGE_NONE][0]['value'])) {
+                $host = $mailserver->field_host[LANGUAGE_NONE][0]['value'];
+            }
+            $port = '';
+            if (isset($mailserver->field_port[LANGUAGE_NONE][0]['value'])) {
+                $port = $mailserver->field_port[LANGUAGE_NONE][0]['value'];
+            }
+            $username = '';
+            if (isset($mailserver->field_username[LANGUAGE_NONE][0]['value'])) {
+                $username = $mailserver->field_username[LANGUAGE_NONE][0]['value'];
+            }
+            $password = '';
+            if (isset($mailserver->field_password[LANGUAGE_NONE][0]['value'])) {
+                $password = $mailserver->field_password[LANGUAGE_NONE][0]['value'];
+            }
+            $emailTo = '';
+            if (isset($daytIn['emailTo'])) {
+                $emailTo = $daytIn['emailTo'];
+            }
+            $mailsubject = '';
+            if (isset($daytIn['mailsubject'])) {
+                $mailsubject = $daytIn['mailsubject'];
+            }
+            $html_message = '';
+            if (isset($daytIn['html_message'])) {
+                $html_message = $daytIn['html_message'];
+            }
+            if ($emailTo != '') {
+                $mail = new \PHPMailer\PHPMailer\PHPMailer();
+                $mail->IsSMTP();
+                $mail->SMTPAuth = true;
+                $mail->CharSet = "UTF-8";
+//                $mail->SMTPSecure = 'tls';
+                $mail->Host = $host;
+                $mail->Port = $port;
+                $mail->Username = $username;
+                $mail->Password = $password;
+                $mail->From = $username;
+                $mail->FromName = variable_get('site_name');
+                $mail->addAddress($emailTo, $name);
+                $mail->isHTML(true);
+                $mail->Subject = $mailsubject;
+                $mail->Body = $html_message;
+                $mail->AltBody = "This is the plain text version of the email content";
+                if ($mail->send()) {
+                    //$data['msg'] = t('Thank you for your message. We will get back to you the soonest.');
+                    $data['error'] = 0;
+                } else {
+//                    echo $mail->ErrorInfo;
+                    //$data['msg'] = t('There was a problem sending the Email. Please try again.');
+                    $data['error'] = 1;
+                }
+            }
+        }
+    }
+    return $data;
+}
+
+function getMailserverByToken($token = '') {
+    $nid = 0;
+    $total_items_nids = [];
+    if (trim($token) != '') {
+        $items = array();
+        $query = new EntityFieldQuery();
+        $query->entityCondition('entity_type', 'node')
+                ->entityCondition('bundle', 'mailserver')
+                ->propertyCondition('status', 1)
+                ->propertyOrderBy('nid', 'ASC');
+        $query->addMetaData('account', user_load(1));
+        $query->fieldCondition('field_token', 'value', $token, '=');
+        $result = $query->execute();
+        if (isset($result['node'])) {
+            $total_items_nids = array_keys($result['node']);
+        }
+        if (isset($total_items_nids[0])) {
+            $nid = $total_items_nids[0];
+        }
+    }
+    $node = [];
+    if ($nid != 0) {
+        $node = node_load($nid);
+    }
+    return $node;
 }
