@@ -1,0 +1,11 @@
+.env
+/nbproject
+/nbproject/private/
+.settings/
+.project
+vendor
+composer.lock
+files/
+sites/*/files
+sites/*/private
+sites/*/translations
